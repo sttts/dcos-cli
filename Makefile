@@ -8,3 +8,7 @@ env:
 
 test:
 	bin/test.sh
+
+dist:
+	bin/dist.sh
+
