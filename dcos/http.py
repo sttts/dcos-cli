@@ -1,6 +1,6 @@
 import requests
 from dcos import util
-from dcos.errors import DCOSException, DefaultError, Error
+from dcos.errors import DCOSException
 
 logger = util.get_logger(__name__)
 
@@ -19,16 +19,28 @@ def _default_is_success(status_code):
 
 def _default_to_error(response):
     """
-    :param response: HTTP response object or Error
-    :type response: requests.Response or Error
+    :param response: HTTP response object or Exception
+    :type response: requests.Response | Exception
     :returns: the error embedded in the response JSON
-    :rtype: Error
+    :rtype: Exception
     """
 
-    if isinstance(response, Error):
+    if isinstance(response, Exception) and \
+       not isinstance(response, requests.exceptions.RequestException):
         return response
 
-    return DefaultError('{}: {}'.format(response.status_code, response.text))
+    url = response.request.url
+    if isinstance(response, requests.exceptions.ConnectionError):
+        return DCOSException('URL [{0}] is unreachable: {1}'
+                             .format(url, response))
+    elif isinstance(response, requests.exceptions.Timeout):
+        return DCOSException('Request to URL [{0}] timed out'.format(url))
+    elif isinstance(response, requests.exceptions.RequestException):
+        return response
+    else:
+        return DCOSException(
+            'Error while fetching [{0}]: HTTP {1}: {2}'.format(
+                url, response.status_code, response.reason))
 
 
 def request(method,
@@ -46,7 +58,7 @@ def request(method,
     :param is_success: Defines successful status codes for the request
     :type is_success: Function from int to bool
     :param to_error: Builds an Error from an unsuccessful response or Error
-    :type to_error: Function from requests.Response or Error to Error
+    :type to_error: (requests.Response | Error) -> Error
     :param kwargs: Additional arguments to requests.request
         (see http://docs.python-requests.org/en/latest/api/#requests.request)
     :type kwargs: dict
@@ -72,7 +84,7 @@ def request(method,
         with requests.Session() as session:
             response = session.send(request.prepare(), timeout=timeout)
     except Exception as ex:
-        raise DCOSException(to_error(DefaultError(str(ex))).error())
+        raise to_error(ex)
 
     logger.info('Received HTTP response [%r]: %r',
                 response.status_code,
@@ -81,7 +93,7 @@ def request(method,
     if is_success(response.status_code):
         return response
     else:
-        raise DCOSException(to_error(response).error())
+        raise to_error(response)
 
 
 def head(url, to_error=_default_to_error, **kwargs):
