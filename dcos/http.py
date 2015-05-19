@@ -36,6 +36,7 @@ def request(method,
             timeout=3.0,
             is_success=_default_is_success,
             to_error=_default_to_error,
+            verify=True,
             **kwargs):
     """Sends an HTTP request.
 
@@ -70,8 +71,13 @@ def request(method,
             request.headers)
 
         with requests.Session() as session:
-            response = session.send(request.prepare(), timeout=timeout)
+            response = session.send(
+                request.prepare(),
+                timeout=timeout,
+                verify=verify)
     except Exception as ex:
+        logger.exception('Failed to make http request')
+
         raise DCOSException(to_error(DefaultError(str(ex))).error())
 
     logger.info('Received HTTP response [%r]: %r',

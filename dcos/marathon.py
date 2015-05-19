@@ -81,6 +81,10 @@ class Client(object):
 
     def __init__(self, marathon_uri):
         self._base_uri = marathon_uri
+        self._verifyCertificate = False
+
+        # We need to silence certificate warnings
+        http.silence_requests_warnings()
 
         min_version = "0.8.1"
         version = LooseVersion(self.get_about()["version"])
@@ -110,7 +114,10 @@ class Client(object):
 
         url = self._create_url('v2/info')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json()
 
@@ -133,7 +140,10 @@ class Client(object):
             url = self._create_url(
                 'v2/apps{}/versions/{}'.format(app_id, version))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         # Looks like Marathon return different JSON for versions
         if version is None:
@@ -150,7 +160,10 @@ class Client(object):
 
         url = self._create_url('v2/groups')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json()['groups']
 
@@ -173,7 +186,10 @@ class Client(object):
             url = self._create_url(
                 'v2/groups{}/versions/{}'.format(group_id, version))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json()
 
@@ -200,7 +216,10 @@ class Client(object):
 
         url = self._create_url('v2/apps{}/versions'.format(app_id))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         if max_count is None:
             return response.json()['versions']
@@ -216,7 +235,10 @@ class Client(object):
 
         url = self._create_url('v2/apps')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(
+            url,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json()['apps']
 
@@ -237,9 +259,11 @@ class Client(object):
         else:
             app_json = app_resource
 
-        response = http.post(url,
-                             json=app_json,
-                             to_error=_to_error)
+        response = http.post(
+            url,
+            json=app_json,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json()
 
@@ -265,10 +289,12 @@ class Client(object):
 
         url = self._create_url('v2/apps{}'.format(app_id))
 
-        response = http.put(url,
-                            params=params,
-                            json=payload,
-                            to_error=_to_error)
+        response = http.put(
+            url,
+            params=params,
+            json=payload,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         return response.json().get('deploymentId')
 
@@ -294,10 +320,12 @@ class Client(object):
 
         url = self._create_url('v2/apps{}'.format(app_id))
 
-        response, error = http.put(url,
-                                   params=params,
-                                   json={'instances': int(instances)},
-                                   to_error=_to_error)
+        response, error = http.put(
+            url,
+            params=params,
+            json={'instances': int(instances)},
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
         if error is not None:
             return (None, error)
@@ -337,7 +365,11 @@ class Client(object):
 
         url = self._create_url('v2/apps{}'.format(app_id))
 
-        http.delete(url, params=params, to_error=_to_error)
+        http.delete(
+            url,
+            params=params,
+            to_error=_to_error,
+            verify=self._verifyCertificate)
 
     def remove_group(self, group_id, force=None):
         """Completely removes the requested application.

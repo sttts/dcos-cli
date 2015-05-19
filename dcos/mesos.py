@@ -1,8 +1,7 @@
 import fnmatch
 import itertools
 
-import dcos.http
-from dcos import util
+from dcos import http, util
 from dcos.errors import DCOSException
 
 from six.moves import urllib
@@ -36,9 +35,6 @@ def get_mesos_url(config):
         return mesos_master_url
 
 
-MESOS_TIMEOUT = 3
-
-
 class MesosMaster(object):
     """Mesos Master Model
 
@@ -49,6 +45,10 @@ class MesosMaster(object):
     def __init__(self, url):
         self._url = url
         self._state = None
+        self._verifyCertificate = False
+
+        # We need to silence certificate warnings
+        http.silence_requests_warnings()
 
     def state(self):
         """Returns master's /master/state.json.  Fetches and saves it if we
@@ -204,9 +204,10 @@ class MesosMaster(object):
         """
 
         url = urllib.parse.urljoin(self._url, path)
-        return dcos.http.get(url,
-                             timeout=MESOS_TIMEOUT,
-                             **kwargs)
+        return http.get(
+            url,
+            verify=self._verifyCertificate,
+            **kwargs)
 
 
 class MesosSlave(object):
