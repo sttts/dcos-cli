@@ -46,11 +46,11 @@ def _get_marathon_url(config):
     return marathon_url
 
 
-def _to_error(response):
+def _to_exception(response):
     """
-    :param response: HTTP response object or Error
-    :type response: requests.Response | Error
-    :returns: the error embedded in the response JSON
+    :param response: HTTP response object or Exception
+    :type response: requests.Response | Exception
+    :returns: An exception with the message from the response JSON
     :rtype: Exception
     """
 
@@ -110,7 +110,7 @@ class Client(object):
 
         url = self._create_url('v2/info')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         return response.json()
 
@@ -133,7 +133,7 @@ class Client(object):
             url = self._create_url(
                 'v2/apps{}/versions/{}'.format(app_id, version))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         # Looks like Marathon return different JSON for versions
         if version is None:
@@ -150,7 +150,7 @@ class Client(object):
 
         url = self._create_url('v2/groups')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         return response.json()['groups']
 
@@ -173,7 +173,7 @@ class Client(object):
             url = self._create_url(
                 'v2/groups{}/versions/{}'.format(group_id, version))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         return response.json()
 
@@ -200,7 +200,7 @@ class Client(object):
 
         url = self._create_url('v2/apps{}/versions'.format(app_id))
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         if max_count is None:
             return response.json()['versions']
@@ -216,7 +216,7 @@ class Client(object):
 
         url = self._create_url('v2/apps')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         return response.json()['apps']
 
@@ -239,7 +239,7 @@ class Client(object):
 
         response = http.post(url,
                              json=app_json,
-                             to_error=_to_error)
+                             to_exception=_to_exception)
 
         return response.json()
 
@@ -268,7 +268,7 @@ class Client(object):
         response = http.put(url,
                             params=params,
                             json=payload,
-                            to_error=_to_error)
+                            to_exception=_to_exception)
 
         return response.json().get('deploymentId')
 
@@ -297,7 +297,7 @@ class Client(object):
         response, error = http.put(url,
                                    params=params,
                                    json={'instances': int(instances)},
-                                   to_error=_to_error)
+                                   to_exception=_to_exception)
 
         if error is not None:
             return (None, error)
@@ -337,7 +337,7 @@ class Client(object):
 
         url = self._create_url('v2/apps{}'.format(app_id))
 
-        http.delete(url, params=params, to_error=_to_error)
+        http.delete(url, params=params, to_exception=_to_exception)
 
     def remove_group(self, group_id, force=None):
         """Completely removes the requested application.
@@ -358,7 +358,7 @@ class Client(object):
 
         url = self._create_url('v2/groups{}'.format(group_id))
 
-        http.delete(url, params=params, to_error=_to_error)
+        http.delete(url, params=params, to_exception=_to_exception)
 
     def restart_app(self, app_id, force=None):
         """Performs a rolling restart of all of the tasks.
@@ -382,7 +382,7 @@ class Client(object):
 
         response = http.post(url,
                              params=params,
-                             to_error=_to_error)
+                             to_exception=_to_exception)
 
         return response.json()
 
@@ -398,7 +398,7 @@ class Client(object):
         url = self._create_url('v2/deployments')
 
         response = http.get(url,
-                            to_error=_to_error)
+                            to_exception=_to_exception)
 
         deployment = next(
             (deployment for deployment in response.json()
@@ -418,7 +418,7 @@ class Client(object):
 
         url = self._create_url('v2/deployments')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         if app_id is not None:
             app_id = self.normalize_app_id(app_id)
@@ -455,7 +455,7 @@ class Client(object):
         response = http.delete(
             url,
             params=params,
-            to_error=_to_error)
+            to_exception=_to_exception)
 
         if force:
             return None
@@ -494,7 +494,7 @@ class Client(object):
 
         url = self._create_url('v2/tasks')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         if app_id is not None:
             app_id = self.normalize_app_id(app_id)
@@ -518,7 +518,7 @@ class Client(object):
 
         url = self._create_url('v2/tasks')
 
-        response = http.get(url, to_error=_to_error)
+        response = http.get(url, to_exception=_to_exception)
 
         task = next(
             (task for task in response.json()['tasks']
@@ -554,7 +554,7 @@ class Client(object):
         else:
             group_json = group_resource
 
-        response = http.post(url, json=group_json, to_error=_to_error)
+        response = http.post(url, json=group_json, to_exception=_to_exception)
 
         return response.json()
 

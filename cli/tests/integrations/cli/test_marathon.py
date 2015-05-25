@@ -122,7 +122,7 @@ def test_missing_config(missing_env):
         ['dcos', 'marathon', 'app', 'list'],
         returncode=1,
         stderr=(b"Marathon likely misconfigured. Please check your proxy or "
-                b"Marathon URI settings. See dcos config --help. \n"),
+                b"Marathon URL settings. See dcos config --help. \n"),
         env=missing_env)
 
 
@@ -614,7 +614,7 @@ def test_bad_configuration():
     assert stdout == b''
     assert stderr.decode().startswith(
         "Marathon likely misconfigured. Please check your proxy or "
-        "Marathon URI settings. See dcos config --help. ")
+        "Marathon URL settings. See dcos config --help. ")
 
     assert_command(['dcos', 'config', 'unset', 'marathon.url'])
 

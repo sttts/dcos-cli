@@ -141,7 +141,6 @@ class MesosMaster(object):
         else:
             return tasks[0]
 
-
     def framework(self, framework_id):
         """Returns a framework by id
 
@@ -151,7 +150,7 @@ class MesosMaster(object):
         :rtype: Framework
         """
 
-        for f in self._framework_dicts(active_only=False):
+        for f in self._framework_dicts(True, True):
             if f['id'] == framework_id:
                 return self._framework_obj(f)
         return None
@@ -186,14 +185,13 @@ class MesosMaster(object):
             keys = ['completed_tasks']
 
         tasks = []
-        for framework in self._framework_dicts(active_only):
+        for framework in self._framework_dicts(completed, completed):
             for task in _merge(framework, keys):
                 if fltr in task['id'] or fnmatch.fnmatchcase(task['id'], fltr):
                     task = self._framework_obj(framework).task(task['id'])
                     tasks.append(task)
 
         return tasks
-
 
     def frameworks(self, inactive=False, completed=False):
         """Returns a list of all frameworks
@@ -331,7 +329,7 @@ class MesosSlave(object):
         return _merge(self.state(), ['frameworks', 'completed_frameworks'])
 
     def executor_dicts(self):
-        """Returns the executor dictionaries from the state.json dict
+        """Returns the executor dictionaries from the state.json
 
         :returns: executors
         :rtype: [dict]
@@ -474,8 +472,7 @@ class Task(object):
                             'queued_tasks'])
             if any(task['id'] == self['id'] for task in tasks):
                 return executor
-        raise DCOSException(
-            'Could not find an executor for task [{0}]'.format(self['id']))
+        return None
 
     def directory(self):
         """ Sandbox directory for this task

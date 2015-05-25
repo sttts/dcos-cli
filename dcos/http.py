@@ -17,11 +17,11 @@ def _default_is_success(status_code):
     return status_code >= 200 and status_code < 300
 
 
-def _default_to_error(response):
+def _default_to_exception(response):
     """
     :param response: HTTP response object or Exception
     :type response: requests.Response | Exception
-    :returns: the error embedded in the response JSON
+    :returns: exception
     :rtype: Exception
     """
 
@@ -47,7 +47,7 @@ def request(method,
             url,
             timeout=3.0,
             is_success=_default_is_success,
-            to_error=_default_to_error,
+            to_exception=_default_to_exception,
             **kwargs):
     """Sends an HTTP request.
 
@@ -57,8 +57,8 @@ def request(method,
     :type url: str
     :param is_success: Defines successful status codes for the request
     :type is_success: Function from int to bool
-    :param to_error: Builds an Error from an unsuccessful response or Error
-    :type to_error: (requests.Response | Error) -> Error
+    :param to_exception: Builds an Error from an unsuccessful response or Error
+    :type to_exception: (requests.Response | Error) -> Error
     :param kwargs: Additional arguments to requests.request
         (see http://docs.python-requests.org/en/latest/api/#requests.request)
     :type kwargs: dict
@@ -84,7 +84,7 @@ def request(method,
         with requests.Session() as session:
             response = session.send(request.prepare(), timeout=timeout)
     except Exception as ex:
-        raise to_error(ex)
+        raise to_exception(ex)
 
     logger.info('Received HTTP response [%r]: %r',
                 response.status_code,
@@ -93,10 +93,10 @@ def request(method,
     if is_success(response.status_code):
         return response
     else:
-        raise to_error(response)
+        raise to_exception(response)
 
 
-def head(url, to_error=_default_to_error, **kwargs):
+def head(url, to_exception=_default_to_exception, **kwargs):
     """Sends a HEAD request.
 
     :param url: URL for the new Request object
@@ -110,7 +110,7 @@ def head(url, to_error=_default_to_error, **kwargs):
     return request('head', url, **kwargs)
 
 
-def get(url, to_error=_default_to_error, **kwargs):
+def get(url, to_exception=_default_to_exception, **kwargs):
     """Sends a GET request.
 
     :param url: URL for the new Request object
@@ -121,10 +121,11 @@ def get(url, to_error=_default_to_error, **kwargs):
     :rtype: Response
     """
 
-    return request('get', url, to_error=to_error, **kwargs)
+    return request('get', url, to_exception=to_exception, **kwargs)
 
 
-def post(url, to_error=_default_to_error, data=None, json=None, **kwargs):
+def post(url, to_exception=_default_to_exception,
+         data=None, json=None, **kwargs):
     """Sends a POST request.
 
     :param url: URL for the new Request object
@@ -139,11 +140,11 @@ def post(url, to_error=_default_to_error, data=None, json=None, **kwargs):
     :rtype: Response
     """
 
-    return request('post',
-                   url, to_error=to_error, data=data, json=json, **kwargs)
+    return request('post', url,
+                   to_exception=to_exception, data=data, json=json, **kwargs)
 
 
-def put(url, to_error=_default_to_error, data=None, **kwargs):
+def put(url, to_exception=_default_to_exception, data=None, **kwargs):
     """Sends a PUT request.
 
     :param url: URL for the new Request object
@@ -156,10 +157,10 @@ def put(url, to_error=_default_to_error, data=None, **kwargs):
     :rtype: Response
     """
 
-    return request('put', url, to_error=to_error, data=data, **kwargs)
+    return request('put', url, to_exception=to_exception, data=data, **kwargs)
 
 
-def patch(url, to_error=_default_to_error, data=None, **kwargs):
+def patch(url, to_exception=_default_to_exception, data=None, **kwargs):
     """Sends a PATCH request.
 
     :param url: URL for the new Request object
@@ -172,10 +173,11 @@ def patch(url, to_error=_default_to_error, data=None, **kwargs):
     :rtype: Response
     """
 
-    return request('patch', url, to_error=to_error, data=data, **kwargs)
+    return request('patch', url,
+                   to_exception=to_exception, data=data, **kwargs)
 
 
-def delete(url, to_error=_default_to_error, **kwargs):
+def delete(url, to_exception=_default_to_exception, **kwargs):
     """Sends a DELETE request.
 
     :param url: URL for the new Request object
@@ -186,7 +188,7 @@ def delete(url, to_error=_default_to_error, **kwargs):
     :rtype: Response
     """
 
-    return request('delete', url, to_error=to_error, **kwargs)
+    return request('delete', url, to_exception=to_exception, **kwargs)
 
 
 def silence_requests_warnings():

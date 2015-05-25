@@ -49,7 +49,7 @@ def service():
         },
         "user": "root",
         "webui_url": "http://mesos:8080"
-    })
+    }, None)
 
     return service
 

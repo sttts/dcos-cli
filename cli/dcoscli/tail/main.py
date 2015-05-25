@@ -2,29 +2,31 @@
 
 Usage:
     dcos tail --info
-    dcos tail [--follow --inactive --lines=N] <task> <file>
+    dcos tail [--follow --completed --lines=N] <task> [<file>]
 
 Options:
     -h, --help    Show this screen
     --info        Show a short description of this subcommand
     --follow      Output data as the file grows
-    --inactive    Show inactive tasks as well
+    --completed   Tail files from completed tasks as well
     --lines=N     Output the last N lines [default: 10]
     --version     Show version
 
 Positional Arguments:
 
     <task>        Only match tasks whose ID matches <task>.  <task> may be
-                  some substring of the ID, or a regular expression.
+                  some substring of the ID, or a unix glob pattern.
+
+    <file>        Output this file. [default: stdout]
 """
 
 import functools
+import sys
 import time
 
 import concurrent.futures
 import dcoscli
 import docopt
-import requests
 from dcos import cmds, emitting, mesos, util
 from dcos.errors import DCOSException, DefaultError
 
@@ -64,7 +66,8 @@ def _cmds():
 
         cmds.Command(
             hierarchy=['tail'],
-            arg_keys=['--follow', '--inactive', '--lines', '<task>', '<file>'],
+            arg_keys=['--follow', '--completed', '--lines', '<task>',
+                      '<file>'],
             function=_tail),
     ]
 
@@ -80,13 +83,16 @@ def _info():
     return 0
 
 
-def _tail(follow, inactive, lines, task, path):
+NO_FILE_EXCEPTION = DCOSException('No files exist.  Exiting.')
+
+
+def _tail(follow, completed, lines, task, path):
     """ Tail a file in the task's sandbox.
 
     :param follow: same as unix tail's -f
     :type follow: bool
-    :param inactive: whether to include inactive tasks
-    :type inactive: bool
+    :param completed: whether to include completed tasks
+    :type completed: bool
     :param lines: number of lines to print
     :type lines: int
     :param task: task pattern to match
@@ -102,51 +108,71 @@ def _tail(follow, inactive, lines, task, path):
     else:
         fltr = task
 
+    if path is None:
+        path = 'stdout'
+
     lines = int(lines)
 
-    mesos_files = _mesos_files(inactive, fltr, path)
+    mesos_files = _mesos_files(completed, fltr, path)
     if not mesos_files:
-        raise DCOSException('No files to read.  Exiting.')
+        raise DCOSException('No matching tasks.  Exiting.')
 
     fn = functools.partial(_read_last_lines, lines)
-    curr_header = None
-    curr_header, mesos_files = _stream_files(curr_header, fn, mesos_files)
+    curr_header, mesos_files = _stream_files(None, fn, mesos_files)
+    if not mesos_files:
+        raise NO_FILE_EXCEPTION
 
     while follow:
+        # This flush is needed only for testing, since stdout is fully
+        # buffered (as opposed to line-buffered) when redirected to a
+        # pipe.  So if we don't flush, our --follow tests, which use a
+        # pipe, never see the data
+        sys.stdout.flush()
+
         curr_header, mesos_files = _stream_files(curr_header,
                                                  _read_rest,
                                                  mesos_files)
         if not mesos_files:
-            raise DCOSException('No files to read.  Exiting')
+            raise NO_FILE_EXCEPTION
         time.sleep(1)
 
     return 0
 
 
-def _mesos_files(inactive, fltr, path):
-    """Return MesosFile objects for the specified files.
+def _mesos_files(completed, fltr, path):
+    """Return MesosFile objects for the specified files.  Only include
+    files that satisfy all of the following:
 
-    :param inactive: whether to include inactive tasks
-    :type inactive: bool
+    a) belong to an available slave
+    b) have an executor entry on the slave
+
+    :param completed: whether to include completed tasks
+    :type completed: bool
     :param fltr: task pattern to match
     :type fltr: str
     :param path: file path to read
     :type path: str
     :returns: MesosFile objects
     :rtype: [MesosFile]
+
     """
 
     # get tasks
     master = mesos.get_master()
-    tasks = master.tasks(active_only=(not inactive), fltr=fltr)
+    tasks = master.tasks(completed=completed, fltr=fltr)
 
     # load slave state in parallel
     slaves = _load_slaves_state([task.slave() for task in tasks])
 
-    # create files
+    # some completed tasks may have entries on the master, but none on
+    # the slave.  since we need the slave entry to get the executor
+    # sandbox, we only include files with an executor entry.
+    available_tasks = [task for task in tasks
+                       if task.slave() in slaves and task.executor()]
+
+    # create files.
     return [mesos.MesosFile(task, path)
-            for task in tasks
-            if task.slave() in slaves]
+            for task in available_tasks]
 
 
 def _load_slaves_state(slaves):
@@ -165,10 +191,9 @@ def _load_slaves_state(slaves):
         try:
             job.result()
             reachable_slaves.append(slave)
-        except requests.exceptions.ConnectionError as e:
-            emitter.publish(DefaultError(
-                'Slave at URL {0} is unreachable: {1}'.
-                format(slave.base_url(), e)))
+        except DCOSException as e:
+            emitter.publish(
+                DefaultError('Error accessing slave: {0}'.format(e)))
 
     return reachable_slaves
 
@@ -204,22 +229,31 @@ def _stream_files(curr_header, fn, mesos_files):
         try:
             lines = job.result()
         except DCOSException as e:
-            emitter.publish(DefaultError(
-                "Error reading file: {}".format(str(e))))
+            # The read function might throw an exception if read.json
+            # is unavailable, or if the file doesn't exist in the
+            # sandbox.  In any case, we silently remove the file and
+            # continue.
+            logger.warning("Error reading file: {}".format(e))
+
             reachable_files.remove(mesos_file)
             continue
 
-        curr_header = _output(curr_header, str(mesos_file), lines)
+        curr_header = _output(curr_header,
+                              len(reachable_files) > 1,
+                              str(mesos_file),
+                              lines)
 
     return curr_header, reachable_files
 
 
-def _output(curr_header, header, lines):
+def _output(curr_header, output_header, header, lines):
     """Prints a sequence of lines.  If `header` is different than
     `curr_header`, first print the header.
 
     :param curr_header: most recently printed header
     :type curr_header: str
+    :param output_header: whether or not to output the header
+    :type output_header: bool
     :param header: header for `lines`
     :type header: str
     :param lines: lines to print
@@ -229,7 +263,7 @@ def _output(curr_header, header, lines):
     """
 
     if lines:
-        if header != curr_header:
+        if output_header and header != curr_header:
             emitter.publish('===> {} <==='.format(header))
         for line in lines:
             emitter.publish(line)
@@ -237,8 +271,8 @@ def _output(curr_header, header, lines):
 
 
 def _stream(fn, objs):
-    """Apply `fn` to `objs` in parallel, yielding the Future for each as
-    it completes.
+    """Apply `fn` to `objs` in parallel, yielding the (Future, obj) for
+    each as it completes.
 
     :param fn: function
     :type fn: function
@@ -246,6 +280,7 @@ def _stream(fn, objs):
     :type objs: objs
     :returns: iterator over (Future, typeof(obj))
     :rtype: iterator over (Future, typeof(obj))
+
     """
 
     with concurrent.futures.ThreadPoolExecutor(20) as pool:
