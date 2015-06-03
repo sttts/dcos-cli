@@ -14,7 +14,7 @@ logger = util.get_logger(__name__)
 def command_executables(subcommand, dcos_path):
     """List the real path to executable dcos program for specified subcommand.
 
-    :param subcommand: name of subcommand. E.g. marathon
+    :param subcommand: name of subcommand. E.g. Marathon
     :type subcommand: str
     :param dcos_path: path to the dcos cli directory
     :type dcos_path: str
@@ -22,11 +22,7 @@ def command_executables(subcommand, dcos_path):
     :rtype: str
     """
 
-    executables = [
-        command_path
-        for command_path in list_paths(dcos_path)
-        if noun(command_path) == subcommand
-    ]
+    executables = get_all_command_executables(subcommand, dcos_path)
 
     if len(executables) > 1:
         msg = 'Found more than one executable for command {!r}.'
@@ -37,6 +33,24 @@ def command_executables(subcommand, dcos_path):
         raise DCOSException(msg.format(subcommand))
 
     return executables[0]
+
+
+def get_all_command_executables(subcommand, dcos_path):
+    """List the real paths to executable dcos program(s) for specified subcommand.
+
+    :param subcommand: name of subcommand. E.g. Marathon
+    :type subcommand: str
+    :param dcos_path: path to the dcos cli directory
+    :type dcos_path: str
+    :returns: the dcos program paths
+    :rtype: [str]
+    """
+    executables = [
+        command_path
+        for command_path in list_paths(dcos_path)
+        if noun(command_path) == subcommand
+    ]
+    return executables
 
 
 def list_paths(dcos_path):

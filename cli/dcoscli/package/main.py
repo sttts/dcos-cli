@@ -45,6 +45,7 @@ Configuration:
     ]
 """
 import json
+import re
 import sys
 
 import dcoscli
@@ -350,6 +351,19 @@ def _install(package_name, options_path, app_id, cli, app, yes):
             pkg.name()))
 
         subcommand.install(pkg, pkg_version, options)
+
+        name = pkg.name()
+        path = util.dcos_path()
+        subcommand_paths = subcommand.get_all_command_executables(name, path)
+        new_commands = []
+        for path in subcommand_paths:
+            subcommand_name = path.split('/')[-1]
+            match = re.search('dcos-(.+)', subcommand_name)
+            new_commands += ['dcos {}'.format(match.group(1))]
+
+        if len(new_commands) > 0:
+            commands = ','.join(new_commands)
+            emitter.publish("New command(s) available: {}".format(commands))
 
     post_install_notes = pkg.package_json(pkg_version).get('postInstallNotes')
     if post_install_notes:
