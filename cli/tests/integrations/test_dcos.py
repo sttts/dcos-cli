@@ -17,6 +17,7 @@ for easy management of a DCOS installation.
 
 Available DCOS commands:
 
+\tcluster        \tProvides status about the DCOS cluster managed by this CLI
 \tconfig         \tGet and set DCOS CLI configuration properties
 \thelp           \tDisplay command line usage information
 \tmarathon       \tDeploy and manage applications on the DCOS
